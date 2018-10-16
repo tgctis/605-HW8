@@ -20,12 +20,12 @@ import java.util.zip.GZIPInputStream;
  */
 public class PiEvenOddImprovement implements Runnable{
     private String fileName;
-    private BufferedInputStream byteStream;
+    private InputStream byteStream;
     private boolean compressed;
-    private int streamLength = 100;
+    private int streamLength;
     private int even = 0;
     private int odd = 0;
-    private byte[] streamArray = new byte[streamLength];
+    private byte[] streamArray;
     private int numThreads;
     private int threadNum;
     private PiEvenOddImprovement counter;
@@ -57,6 +57,7 @@ public class PiEvenOddImprovement implements Runnable{
             if(!compressed)
                 byteStream = new BufferedInputStream(readFile);
             else
+                //byteStream = new GZIPInputStream(new BufferedInputStream(readFile));
                 byteStream = new BufferedInputStream(new GZIPInputStream(readFile));
 
             if(byteStream.available() == 0)
@@ -84,14 +85,22 @@ public class PiEvenOddImprovement implements Runnable{
         try{
             int loopNum = 0;
             int numChars = byteStream.available();
+            if(compressed) //we don't know how large the file is...
+                numChars = 1000000000;
             int charPerThread = numChars/numThreads;
+            if(charPerThread > 5000)
+                streamLength = 5000;
+            else{
+                streamLength = charPerThread;
+            }
+            streamArray = new byte[streamLength];
             if(threadNum == 0) {
                 byteStream.skip(2);
                 counter.addOdd();
             }else{
                 byteStream.skip(2+(threadNum*charPerThread));
             }
-//            System.out.println(numChars + " to read.");
+
             System.out.println("I am thread #" + threadNum + " I'm reading chars from " + (threadNum*charPerThread) + " to " + ((threadNum+1) * charPerThread));
             while(byteStream.read(streamArray, 0, streamLength) > 0 && loopNum < (charPerThread/streamLength)){
                 for(byte myChar : streamArray){
@@ -108,7 +117,6 @@ public class PiEvenOddImprovement implements Runnable{
                     }
                 }
                 loopNum++;
-//                System.out.println("Thread #" + threadNum + " -- Current loop = " + loopNum + " loop size: " + streamLength);
             }
         }catch(IOException e){
             System.out.println(e.getMessage());
@@ -117,8 +125,9 @@ public class PiEvenOddImprovement implements Runnable{
 
     public void run(){
         try{
-            openFile();
-            readAndUpdateCounts();
+            if(openFile()) {
+                readAndUpdateCounts();
+            }
         }catch(NoNumbersException e){
             System.out.println(e.getMessage());
         }
@@ -154,27 +163,16 @@ public class PiEvenOddImprovement implements Runnable{
         odd++;
     }
 
-    /**
-     * Gets the ratio of even:odd
-     * @return ratio of even:odd numbers
-     */
-    private double getRatio(){
-        if(odd < 1){
-            return 1.0;
-        }else{
-            return (even * 1.0) / (odd * 1.0);
-        }
-    }
 
     /**
      * Main method
      * @param args [0] First argument is the filename to be read in
      */
     public static void main(String args[]){
-        int numThreads = 5;
+        int numThreads = 20;
         Thread[] allThreads;
+        PiEvenOddImprovement[] allCounters;
         String fileName = "\0";
-        PiEvenOddImprovement countPi = new PiEvenOddImprovement();
 
         if(args.length < 1 || args[0].length() < 1){
             printUsageError();
@@ -189,6 +187,8 @@ public class PiEvenOddImprovement implements Runnable{
 
 //        fileName = "src/test_small_pi";
         allThreads = new Thread[numThreads];
+        allCounters = new PiEvenOddImprovement[numThreads];
+
         try {
             //crude index
             boolean compressed = false;
@@ -197,7 +197,10 @@ public class PiEvenOddImprovement implements Runnable{
 
             /*Spin the threads*/
             for(int thread = 0; thread < numThreads; thread++){
-                allThreads[thread] = new Thread(new PiEvenOddImprovement(fileName, compressed, thread, numThreads, countPi));
+                allCounters[thread] = new PiEvenOddImprovement();
+                allThreads[thread] =
+                        new Thread(
+                                new PiEvenOddImprovement(fileName, compressed, thread, numThreads, allCounters[thread]));
                 allThreads[thread].start();
             }
 
@@ -206,11 +209,17 @@ public class PiEvenOddImprovement implements Runnable{
                 allThreads[thread].join();
             }
 
+            int even= 0;
+            int odd = 0;
+            for(int thread = 0; thread < numThreads; thread++){
+                even += allCounters[thread].getEven();
+                odd += allCounters[thread].getOdd();
+            }
             /*reap the rewards*/
             System.out.printf("Ratio of even:odd %d:%d = %.8f\n\n"
-                    , countPi.getEven()
-                    , countPi.getOdd()
-                    , countPi.getRatio()
+                    , even
+                    , odd
+                    , (even * 1.0) / (odd * 1.0)
             );
         }catch(Exception e){
             System.out.println(e.getMessage());
