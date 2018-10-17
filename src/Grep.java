@@ -63,20 +63,18 @@ public class Grep {
         this.pattern = pattern;
     }
 
-    /**
-     * Counts matching objects (default is lines)
-     */
-    private int count(boolean words){
+    private String[] matchEngine(boolean matchWords){
+        //clear old matches
         this.matches = null;
+        //creation of a new pattern if necessary
         String line_pattern;
-        if(words){
-            line_pattern = "\\b+" + pattern + ".*";
+        if(matchWords){
+//            line_pattern = "\\b+" + pattern;
+            line_pattern = "\\b+" + pattern;
         }else {
             line_pattern = ".*" + pattern + ".*";
         }
         System.out.println("Matching " + line_pattern);
-        //Need a line reader for this
-
         try{
             String line;
             LineNumberReader reader = new LineNumberReader(new FileReader(fileName));
@@ -106,7 +104,13 @@ public class Grep {
             System.err.println(e.getMessage());
             e.printStackTrace();
         }
+        return this.matches;
+    }
 
+    /**
+     * Counts matching objects (default is lines)
+     */
+    private int count(){
         if(matches != null)
             return matches.length;
         else
@@ -143,12 +147,13 @@ public class Grep {
         boolean hasPattern = false;
         boolean test = true;
         boolean doCount = false;
+        boolean doWords = false;
         String fileName = "\0";
         String pattern = "\0";
 
         if(test){
             args = new String[4];
-            args[0] = "-l";
+            args[0] = "-w";
             args[1] = "-c";
             args[2] = "one";
             args[3] = "src/input.txt";
@@ -165,6 +170,8 @@ public class Grep {
             if(arg.charAt(0) == '-'){
                 if(arg.charAt(1) == 'c')
                     doCount = true;
+                if(arg.charAt(1) == 'w')
+                    doWords = true;
             }else{
                 if(hasPattern) {
                     fileName = arg;
@@ -177,11 +184,11 @@ public class Grep {
         System.out.println("File: '" + fileName + "' & Pattern: '" + pattern + "'");
         Grep testGrep = new Grep(pattern, fileName);
 
-        if(doCount){
-            System.out.println(testGrep.count(false));
-        }
+        testGrep.matchEngine(doWords);
 
-        System.out.println(testGrep.count(true));
+        if(doCount){
+            System.out.println(testGrep.count());
+        }
     }
 
 }
