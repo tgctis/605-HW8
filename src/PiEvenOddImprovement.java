@@ -29,6 +29,7 @@ public class PiEvenOddImprovement implements Runnable{
     private int numThreads;
     private int threadNum;
     private PiEvenOddImprovement counter;
+    private final int MAX_STREAM_LENGTH = 65536;
 
     public PiEvenOddImprovement(){
         //final counter
@@ -57,8 +58,9 @@ public class PiEvenOddImprovement implements Runnable{
             if(!compressed)
                 byteStream = new BufferedInputStream(readFile);
             else
-                //byteStream = new GZIPInputStream(new BufferedInputStream(readFile));
-                byteStream = new BufferedInputStream(new GZIPInputStream(readFile));
+                byteStream = new GZIPInputStream(readFile, MAX_STREAM_LENGTH);
+//                byteStream = new GZIPInputStream(new BufferedInputStream(readFile), 5000);
+//                byteStream = new BufferedInputStream(new GZIPInputStream(readFile));
 
             if(byteStream.available() == 0)
                 throw new EmptyFileException("This is an empty file.");
@@ -85,15 +87,22 @@ public class PiEvenOddImprovement implements Runnable{
         try{
             int loopNum = 0;
             int numChars = byteStream.available();
+            int totalBytesRead = 0;
+
             if(compressed) //we don't know how large the file is...
                 numChars = 1000000000;
+
+            //how many threads do we have? and how many characters should each process?
             int charPerThread = numChars/numThreads;
-            if(charPerThread > 5000)
-                streamLength = 5000;
-            else{
-                streamLength = charPerThread;
-            }
+
+//            if(charPerThread > MAX_STREAM_LENGTH)
+//                streamLength = MAX_STREAM_LENGTH;
+//            else{
+//                streamLength = charPerThread;
+//            }
+            streamLength = MAX_STREAM_LENGTH;
             streamArray = new byte[streamLength];
+
             if(threadNum == 0) {
                 byteStream.skip(2);
                 counter.addOdd();
@@ -101,9 +110,13 @@ public class PiEvenOddImprovement implements Runnable{
                 byteStream.skip(2+(threadNum*charPerThread));
             }
 
-            System.out.println("I am thread #" + threadNum + " I'm reading chars from " + (threadNum*charPerThread) + " to " + ((threadNum+1) * charPerThread));
-            while(byteStream.read(streamArray, 0, streamLength) > 0 && loopNum < (charPerThread/streamLength)){
-                for(byte myChar : streamArray){
+            System.out.println("I am thread #" + threadNum
+                    + " I'm reading chars from " + (threadNum*charPerThread)
+                    + " to " + ((threadNum+1) * charPerThread));
+            int bytesRead = byteStream.read(streamArray, 0, streamLength);
+            while(bytesRead > 0 && totalBytesRead < charPerThread){
+                for(int index = 0; index < bytesRead && (index + totalBytesRead < charPerThread); index++){
+                    int myChar = streamArray[index];
                     if(myChar != 0 && myChar != '\n' && myChar != '\r') {
                         try{
                             int num = Integer.parseInt(String.valueOf((char)myChar));
@@ -116,8 +129,13 @@ public class PiEvenOddImprovement implements Runnable{
                         }
                     }
                 }
+                totalBytesRead += bytesRead;
+                bytesRead = byteStream.read(streamArray, 0, streamLength);
                 loopNum++;
             }
+            System.out.println("Thread #" + threadNum
+                    + " completed " + loopNum + " Loops and read "
+                    + totalBytesRead + " Bytes!");
         }catch(IOException e){
             System.out.println(e.getMessage());
         }
@@ -192,7 +210,7 @@ public class PiEvenOddImprovement implements Runnable{
         try {
             //crude index
             boolean compressed = false;
-            if(fileName.indexOf('.') > 0)
+            if(fileName.matches(".*\\.gz"))
                 compressed = true;
 
             /*Spin the threads*/
