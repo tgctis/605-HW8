@@ -26,7 +26,8 @@ public class Grep {
     private Scanner stdInput;
     private String[] matches;
     private String[] fileMatches;
-    private String[] matchPerFile;
+    private int[] matchPerFile;
+    private String[] matchPerFileString;
 
     /**
      * Generic constructor
@@ -43,7 +44,8 @@ public class Grep {
     public Grep(String pattern, int numFiles){
         this.pattern = pattern;
         this.fileMatches = new String[numFiles];
-        this.matchPerFile = new String[numFiles];
+        this.matchPerFile = new int[numFiles];
+        this.matchPerFileString = new String[numFiles];
         try{
             stdInput = new Scanner(System.in);
         }catch(IOError e){
@@ -106,7 +108,8 @@ public class Grep {
         for(int index = 0; index < fileMatches.length; index++){
             if(fileMatched && fileMatches[index] == null) {
                 fileMatches[index] = fileName;
-                matchPerFile[index] = matches.length + "";
+                matchPerFile[index] = matches.length;
+                matchPerFileString[index] = generateMatchString(fileName);
                 fileMatched = false;
             }
         }
@@ -126,13 +129,26 @@ public class Grep {
             return 0;
     }
 
+    /**
+     * Generates a string representation of all the matches to date
+     * @param fileName the file name that the match is for
+     * @return string representation of matched lines
+     */
+    private String generateMatchString(String fileName){
+        String returnString = "\0";
+        for(String match: matches){
+            returnString += fileName + " : " + match + "\n";
+        }
+        return returnString.trim();
+    }
+
     private static String usageMessage(){
         return "Usage: 'grep {-OPTIONS} PATTERN {FILE}'";
     }
 
     public static void main(String args[]){
         boolean hasPattern = false;
-        boolean test = true;
+        boolean test = false;
         boolean doCount = false;
         boolean doWords = false;
         boolean doQuiet = false;
@@ -159,33 +175,46 @@ public class Grep {
         for(String arg : args){
             //catch the flags
             if(arg.charAt(0) == '-'){
-                if(arg.charAt(1) == 'c')
-                    doCount = true;
-                if(arg.charAt(1) == 'w')
-                    doWords = true;
-                if(arg.charAt(1) == 'q')
-                    doQuiet = true;
-                if(arg.charAt(1) == 'l')
-                    doFilenames = true;
-            }else{
-                if(hasPattern) {
+                for(int index = 1; index < arg.length(); index++){
+                    char argChar = arg.charAt(index);
+                    if (argChar == 'c')
+                        doCount = true;
+                    if (argChar == 'w')
+                        doWords = true;
+                    if (argChar == 'q')
+                        doQuiet = true;
+                    if (argChar == 'l')
+                        doFilenames = true;
+                }
+            }else{//arguments are done, onto pattern/file
+                if(hasPattern) { //pattern comes before file, anything after are files
                     fileName += arg + "|";
-                }else{
+                }else{ //pattern comes before file...
                     hasPattern = true;
                     pattern = arg;
                 }
             }
         }
 
+        //get all the files
         String[] files = fileName.split("\\|");
 
-
+        //get a grep
         Grep testGrep = new Grep(pattern, files.length);
 
+        //run the engine for each file
         for(String file : files){
             testGrep.matchEngine(doWords, file.trim());
         }
 
+        /*
+        Precedence of flags....
+        0. -q | quiet
+        1. -l | filenames
+        2. -c | count
+         */
+
+        //exit if any match comes back positive
         if(doQuiet){
             if(testGrep.count(false) > 0)
                 System.exit(0);
@@ -193,27 +222,36 @@ public class Grep {
                 System.exit(1);
         }
 
-        if(doCount){
-            if(files.length > 1){
-                for(int index = 0; index < files.length; index++){
-                    System.out.println(files[index].trim() + " : " + testGrep.matchPerFile[index]);
-                }
-            }else{
-                System.out.println("\n" + testGrep.count(doFilenames) + " matches!");
+        //Priority 1 - filenames
+        if(doFilenames){
+            for(int index = 0; index < files.length; index++){
+                if(testGrep.matchPerFile[index] > 0)
+                    System.out.println(files[index].trim());
             }
 
-        }else{
-            if(doFilenames){
-                for(String fileMatch : testGrep.fileMatches){
-                    if(fileMatch != null)
-                        System.out.println(fileMatch);
+
+        }else {//not doing filenames...
+            //Priority 2 - counting
+            if(doCount){//count files
+                if(files.length > 1){//multi-file representation
+                    for(int index = 0; index < files.length; index++){
+                        System.out.println(files[index].trim() + " : " + testGrep.matchPerFile[index]);
+                    }
+                }else{//single file representation
+                    System.out.println("\n" + testGrep.count(true) + " matches!");
                 }
-            }else {
-                for (String match : testGrep.matches) {
-                    System.out.println(match);
+            }else {//not counting... want the actual matched lines
+                if(files.length > 1) {//multi-file
+                    for (int index = 0; index < files.length; index++) {
+                        if(testGrep.matchPerFileString[index] != null)
+                            System.out.println(testGrep.matchPerFileString[index]);
+                    }
+                }else {//single-file
+                    for (String match : testGrep.matches) {
+                        System.out.println(match);
+                    }
                 }
             }
         }
     }
-
 }
