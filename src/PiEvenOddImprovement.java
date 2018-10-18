@@ -31,8 +31,8 @@ public class PiEvenOddImprovement extends Thread{
     private int numThreads;
     private int threadNum;
     private PiEvenOddImprovement counter;
-    //public static final int MAX_STREAM_LENGTH = 65536;
-    public static final int MAX_STREAM_LENGTH = 30;
+    public static final int MAX_STREAM_LENGTH = 65536;
+//    public static final int MAX_STREAM_LENGTH = 30;
 
     public PiEvenOddImprovement(){
         //final counter
@@ -45,7 +45,7 @@ public class PiEvenOddImprovement extends Thread{
         this.streamLength = streamArray.length;
         this.streamArray = streamArray;
         this.usingStdin = true;
-        System.out.println("Thread #" + threadNum);
+//        System.out.println("Thread #" + threadNum);
     }
 
     public PiEvenOddImprovement(String fileName, boolean compressed, int threadNum, int numThreads, PiEvenOddImprovement counter){
@@ -154,7 +154,7 @@ public class PiEvenOddImprovement extends Thread{
     }
 
     public void readArrayAndCount(){
-        System.out.println("Thread #" + this.threadNum + " is reading in " + this.streamArray.length + " bytes.");
+//        System.out.println("Thread #" + this.threadNum + " is reading in " + this.streamArray.length + " bytes.");
         for(int myChar : this.streamArray){
             try{
                 if((char)myChar != '.' && (char)myChar != 0){
@@ -164,7 +164,7 @@ public class PiEvenOddImprovement extends Thread{
                 System.err.println(e.getMessage());
             }
         }
-        System.out.println("Thread #" + this.threadNum + " has finished with even:" + this.counter.getEven() + " and odd: " + this.counter.getOdd());
+//        System.out.println("Thread #" + this.threadNum + " has finished with even:" + this.counter.getEven() + " and odd: " + this.counter.getOdd());
     }
 
     /**
@@ -253,10 +253,8 @@ public class PiEvenOddImprovement extends Thread{
 
         try {
             //use stdin
-            if(fileName.length() == 0 || 1==1){
+            if(fileName.length() == 0){
                  byteStream = new InputStreamReader(System.in);
-                 byteStream = new InputStreamReader(new FileInputStream("src/pi_dec_1m.txt"));
-//                 byteStream = new InputStreamReader(new FileInputStream("src/test_small_pi"));
 
                  int totalBytes = 0;
                  int byteCount = 0;
@@ -273,8 +271,8 @@ public class PiEvenOddImprovement extends Thread{
                          byteArray[byteCount] = (byte)inputByte;
                          byteCount++;
                      }else if(byteCount == MAX_STREAM_LENGTH - 1){
-                         System.out.println("New Buffer");
-                         System.out.println("Total Bytes: " + totalBytes);
+//                         System.out.println("New Buffer");
+//                         System.out.println("Total Bytes So Far: " + totalBytes);
                          byteArray[byteCount] = (byte)inputByte;
                          byteCount = 0;
 //                         threaded = false;
@@ -283,7 +281,7 @@ public class PiEvenOddImprovement extends Thread{
                          //keep checking... all threads may be full and we'll have to wait
                          while(!threaded){
                              for(int thread = 0; thread < numThreads; thread++){
-                                 System.out.println("Trying thread #" + thread);
+//                                 System.out.println("Trying thread #" + thread);
                                  //if a thread is null it has died and should be "renewed"
                                  if(allThreads[thread] == null || allThreads[thread].getState() == State.TERMINATED){
                                      allThreads[thread] =
@@ -292,57 +290,35 @@ public class PiEvenOddImprovement extends Thread{
                                                              , thread, numThreads, allCounters[thread]));
                                      threaded = true;
                                      allThreads[thread].start();
-                                     System.out.println("State: " + allThreads[thread].getState());
-//                                     allThreads[thread].join();
+//                                     System.out.println("State: " + allThreads[thread].getState());
                                      thread = numThreads;
                                  }
                                  else{
-                                     System.out.println("Thread #" + thread + " is busy, trying the next...");
+//                                     System.out.println("Thread #" + thread + " is busy, trying the next...");
                                      threaded = false;
                                  }
                              }
-                             //Run through all the threads, no match found
-                             if(!threaded)
-                                System.out.println("All threads full");
                          }
+                         byteArray = new byte[PiEvenOddImprovement.MAX_STREAM_LENGTH];
                      }
                      totalBytes++;
                      threaded = false;
                  }
-                System.out.println("Total: " + totalBytes);
-                System.out.println("Final Array length: " + byteArray.length);
-                 /**FINAL COUNTER**/
-//                byte[] threadStream = byteArray;
-//                //what thread do we send it to?
-//                //keep checking... all threads may be full and we'll have to wait
-//                while(byteArray != null){
-//                    for(int thread = 0; thread < numThreads; thread++){
-//                        //if a thread is null it has died and should be "renewed"
-//                        if(allThreads[thread] == null){
-//                            System.out.println("Spun thread #" + thread);
-//                            allThreads[thread] =
-//                                    new Thread(
-//                                            new PiEvenOddImprovement(threadStream
-//                                                    , thread, numThreads, allCounters[thread]));
-//                            byteArray = null;
-//                            allThreads[thread].start();
-//                            thread = numThreads;
-//                        }
-//                        else{
-//                            System.out.println("Thread #" + thread + " is busy, trying the next...");
-//                        }
-//                    }
-//                    if(byteArray != null)
-//                        System.out.println("All threads full");
-//                }
-                 /**END FINAL COUNTER**/
-                 //join all the threads to make sure they're all completed
+
+                //join all the threads to make sure they're all completed
                 for(int thread = 0; thread < numThreads; thread++){
                     if(allThreads[thread] != null)
                         allThreads[thread].join();
                 }
 
-                System.out.println("Total bytes: " + totalBytes);
+                 /**FINAL COUNTER**/
+                allThreads[0] =
+                        new Thread(
+                                new PiEvenOddImprovement(byteArray
+                                        , 0, numThreads, allCounters[0]));
+                allThreads[0].start();
+                allThreads[0].join();
+                 /**END FINAL COUNTER**/
             }else{
                 if(fileName.matches(".*\\.gz"))
                     compressed = true;
