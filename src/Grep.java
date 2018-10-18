@@ -23,7 +23,6 @@ import java.util.Scanner;
  */
 public class Grep {
     private String pattern;
-    private Scanner stdInput;
     private String[] matches;
     private String[] fileMatches;
     private int[] matchPerFile;
@@ -46,17 +45,9 @@ public class Grep {
         this.fileMatches = new String[numFiles];
         this.matchPerFile = new int[numFiles];
         this.matchPerFileString = new String[numFiles];
-        try{
-            stdInput = new Scanner(System.in);
-        }catch(IOError e){
-            e.printStackTrace();
-        }catch(Exception e){
-            System.err.println(e.getMessage());
-            e.printStackTrace();
-        }
     }
 
-    private String[] matchEngine(boolean matchWords, String fileName){
+    private String[] matchEngine(boolean matchWords, BufferedReader reader, String fileName){
         //clear old matches
         this.matches = null;
         boolean fileMatched = false;
@@ -70,7 +61,7 @@ public class Grep {
         try{
             String line;
             //Read in the lines
-            LineNumberReader reader = new LineNumberReader(new FileReader(fileName));
+//            LineNumberReader reader = new LineNumberReader(new FileReader(fileName));
             while((line = reader.readLine()) != null){
 //                System.out.print("\nLine#: " + reader.getLineNumber() + " Line: " + line);
                 //match the line to whatever it needs to be, words or any substring
@@ -98,7 +89,7 @@ public class Grep {
         }catch(EOFException e){
             //do nothing, end of file
         }catch(IOException e){
-            System.err.println("File: " + fileName + " -- IO Error: " + e.getMessage());
+            System.err.println("IO Error: " + e.getMessage());
             e.printStackTrace();
         }catch(Exception e){
             System.err.println(e.getMessage());
@@ -187,7 +178,7 @@ public class Grep {
                         doFilenames = true;
                 }
             }else{//arguments are done, onto pattern/file
-                if(hasPattern) { //pattern comes before file, anything after are files
+                if(hasPattern) { //pattern comes before file, anything after are files, or if using stdin, nothing
                     fileName += arg + "|";
                 }else{ //pattern comes before file...
                     hasPattern = true;
@@ -202,51 +193,66 @@ public class Grep {
         //get a grep
         Grep testGrep = new Grep(pattern, files.length);
 
-        //run the engine for each file
-        for(String file : files){
-            testGrep.matchEngine(doWords, file.trim());
-        }
+        /*If we're using stdin, we can skip all of the file handling*/
+        if(files[0].matches("\\W+")){
+            try{
+                BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+                testGrep.matchEngine(doWords, reader, "");
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }else {
+            //run the engine for each file
+            for (String file : files) {
+                try{
+                    BufferedReader reader = new BufferedReader(new FileReader(file));
+                    testGrep.matchEngine(doWords, reader, file.trim());
+                }catch(FileNotFoundException e){
+                    System.err.println(file.trim() + " - not found.");
+                }catch(Exception e){
+                    e.printStackTrace();
+                }
 
+            }
+        }
         /*
-        Precedence of flags....
-        0. -q | quiet
-        1. -l | filenames
-        2. -c | count
-         */
+            Precedence of flags....
+            0. -q | quiet
+            1. -l | filenames
+            2. -c | count
+             */
 
         //exit if any match comes back positive
-        if(doQuiet){
-            if(testGrep.count(false) > 0)
+        if (doQuiet) {
+            if (testGrep.count(false) > 0)
                 System.exit(0);
             else
                 System.exit(1);
         }
 
         //Priority 1 - filenames
-        if(doFilenames){
-            for(int index = 0; index < files.length; index++){
-                if(testGrep.matchPerFile[index] > 0)
+        if (doFilenames) {
+            for (int index = 0; index < files.length; index++) {
+                if (testGrep.matchPerFile[index] > 0)
                     System.out.println(files[index].trim());
             }
-
-
-        }else {//not doing filenames...
+        } else {//not doing filenames...
             //Priority 2 - counting
-            if(doCount){//count files
-                if(files.length > 1){//multi-file representation
-                    for(int index = 0; index < files.length; index++){
+            if (doCount) {//count files
+                if (files.length > 1) {//multi-file representation
+                    for (int index = 0; index < files.length; index++) {
                         System.out.println(files[index].trim() + " : " + testGrep.matchPerFile[index]);
                     }
-                }else{//single file representation
-                    System.out.println("\n" + testGrep.count(true) + " matches!");
+                } else {//single file representation
+                    System.out.println("\n" + testGrep.count(true) + "");
                 }
-            }else {//not counting... want the actual matched lines
-                if(files.length > 1) {//multi-file
+            } else {//not counting... want the actual matched lines
+                if (files.length > 1) {//multi-file
                     for (int index = 0; index < files.length; index++) {
-                        if(testGrep.matchPerFileString[index] != null)
+                        if (testGrep.matchPerFileString[index] != null)
                             System.out.println(testGrep.matchPerFileString[index]);
                     }
-                }else {//single-file
+                } else {//single-file
                     for (String match : testGrep.matches) {
                         System.out.println(match);
                     }
