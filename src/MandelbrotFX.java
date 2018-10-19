@@ -20,17 +20,26 @@ public class MandelbrotFX extends Application {
     public void end(String s)   {
 	System.err.println(s + ":       " + ( System.currentTimeMillis() - milliSeconds) + "ms" );
 	System.err.println(" # of cores" +   ":       " +
-	Runtime.getRuntime().availableProcessors() );
+	Runtime.getRuntime().availableProcessors());
+    System.err.println(" # of threads" +   ":       " +
+            Runtime.getRuntime().availableProcessors() * 2);
     }
     
     public void start(Stage theStage) {
-        
-        MandelbrotSet aMandelbrotSet = new MandelbrotSet(IMG_WIDTH, IMG_HEIGHT);
-        
+        int numThreads = Runtime.getRuntime().availableProcessors() * 2;
+        MandelbrotSet aMandelbrotSet = new MandelbrotSet(IMG_WIDTH, IMG_HEIGHT, numThreads);
+
+        /*
         init();
                 mandelBrotSetImage = aMandelbrotSet.createImage();
-        end("Multiple Thread MandelbrotSet Test");
+        end("Single Thread MandelbrotSet Test");
+        */
 
+        init();
+
+            mandelBrotSetImage = aMandelbrotSet.createImage();
+
+        end("Multiple Thread MandelbrotSet Test");
 
         ImageView aImage = new ImageView();        
         aImage.setImage(mandelBrotSetImage);
@@ -56,8 +65,11 @@ class MandelbrotSet extends Thread {
  
     private static final int    MAX_COLORS 	= 256;
     private static final double BOUNDERY = 1000;
-    private static int    width;
-    private static int    height;
+    private static int  width;
+    private static int  height;
+    private int maxH;
+    private int maxW;
+    private static int numThreads;
     private static WritableImage mandelBrotSetImage;
     private static PixelWriter aPixelWriter;
     private static final Color[] colors = new Color[MAX_COLORS];
@@ -65,7 +77,6 @@ class MandelbrotSet extends Thread {
     private static double maxR  = 0.9;
     private static double minI  = -1.3;
     private static double maxI  = 1.28;
-    private static MandelbrotSet[] allThreads;
 
     static {
         for (int index = 0; index < colors.length; index++) {
@@ -73,56 +84,75 @@ class MandelbrotSet extends Thread {
         }
     }
 
-    public MandelbrotSet() {
+    public MandelbrotSet(PixelWriter px, int maxW, int maxH) {
+        this.aPixelWriter = px;
+        this.maxH = maxH;
+        this.maxW = maxW;
     }
-    public MandelbrotSet(int width,int height) {
-	this.width = width;
-	this.height = height;
-	mandelBrotSetImage = new WritableImage(width, height);
-	if ( allThreads == null )
-		allThreads = new MandelbrotSet[width * height ];
+    public MandelbrotSet(int width,int height, int numThreads) {
+        this.width = width;
+        this.height = height;
+        this.numThreads = numThreads;
+        mandelBrotSetImage = new WritableImage(width, height);
     }
     private Color getColor(int count) {
 	    return count >= colors.length ?  Color.BLACK : colors[count];
     }
     private int calc(double re, double img ) {
         int    counter = 0;
-	double length;
-	double aComplexNumberRe = 0;
-	double aComplexNumberImg = 0;
-	double real = 0;
-	double imaginary = 0;
-
+        double length;
+        double aComplexNumberRe = 0;
+        double aComplexNumberImg = 0;
+        double real = 0;
+        double imaginary = 0;
         do {
             real       =  aComplexNumberRe * aComplexNumberRe -
-			 aComplexNumberImg * aComplexNumberImg;
- 	    imaginary  = aComplexNumberRe *  aComplexNumberImg + 
-			 aComplexNumberImg *  aComplexNumberRe;
-	    aComplexNumberRe   = real;
-	    aComplexNumberImg  = imaginary;
-	    aComplexNumberRe   += re;
-	    aComplexNumberImg  += img;
-	    length = aComplexNumberImg * aComplexNumberImg +
-		     aComplexNumberRe * aComplexNumberRe;
+             aComplexNumberImg * aComplexNumberImg;
+            imaginary  = aComplexNumberRe *  aComplexNumberImg +
+             aComplexNumberImg *  aComplexNumberRe;
+            aComplexNumberRe   = real;
+            aComplexNumberImg  = imaginary;
+            aComplexNumberRe   += re;
+            aComplexNumberImg  += img;
+            length = aComplexNumberImg * aComplexNumberImg +
+             aComplexNumberRe * aComplexNumberRe;
             counter++;
         } while (counter < MAX_COLORS && ( length < BOUNDERY ) );
         return counter;
     }
     public Color determineColor(int x, int y)	{
-	double re = (minR * (width - x) + x * maxR) / width;
+	    double re = (minR * (width - x) + x * maxR) / width;
         double img = (minI * (height - y) + y * maxI) / height;
-	return getColor(calc(re, img));
+	    return getColor(calc(re, img));
     }
     public WritableImage createImage()	{
-	mandelBrotSetImage = new WritableImage(width, height);
+	    mandelBrotSetImage = new WritableImage(width, height);
         aPixelWriter = mandelBrotSetImage.getPixelWriter();
 
-        for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {	
-			aPixelWriter.setColor(x, y, determineColor(x, y));
-		}
+        Thread[] allThreads = new Thread[numThreads];
+        int perThreadHeight = height/numThreads;
+
+        for(int thread = 0; thread < numThreads; thread++){
+            allThreads[thread] = new Thread(new MandelbrotSet(aPixelWriter, width, perThreadHeight * (thread+1)));
+            allThreads[thread].start();
         }
-	return mandelBrotSetImage;
+        try{
+            for(int thread = 0; thread < numThreads; thread++) {
+                allThreads[thread].join();
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+	    return mandelBrotSetImage;
+    }
+
+    public void run(){
+        /*For my machine this does 50x50 squares... not exactly what I'm looking for here*/
+        for (int x = 0; x < maxW; x++) {
+            for (int y = (maxH - (height/numThreads)); y < maxH; y++) {
+                aPixelWriter.setColor(x, y, determineColor(x, y));
+            }
+        }
     }
 }
  
