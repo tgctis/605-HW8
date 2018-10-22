@@ -7,8 +7,10 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
+import java.util.List;
+
 public class MandelbrotFX extends Application {
-    
+    static int numThreads;
     WritableImage mandelBrotSetImage;
     final int IMG_WIDTH 	= 800;
     final int IMG_HEIGHT 	= 800;
@@ -18,15 +20,38 @@ public class MandelbrotFX extends Application {
         milliSeconds = System.currentTimeMillis();
     }
     public void end(String s)   {
-	System.err.println(s + ":       " + ( System.currentTimeMillis() - milliSeconds) + "ms" );
-	System.err.println(" # of cores" +   ":       " +
-	Runtime.getRuntime().availableProcessors());
-    System.err.println(" # of threads" +   ":       " +
-            Runtime.getRuntime().availableProcessors() * 2);
+        System.err.println(s + ":       " + ( System.currentTimeMillis() - milliSeconds) + "ms" );
+        System.err.println(" # of cores" +   ":       " +
+        Runtime.getRuntime().availableProcessors());
+        System.err.println(" # of threads" +   ":       " +
+//                Runtime.getRuntime().availableProcessors() * 2);
+                numThreads);
     }
     
     public void start(Stage theStage) {
-        int numThreads = Runtime.getRuntime().availableProcessors() * 2;
+        Parameters p = this.getParameters();
+        List<String> rawParams = null;
+
+        if (p != null) {
+            rawParams = p.getRaw();
+        }else{
+            System.err.println("Usage 'java MandelbrotFX {NUM_THREADS}'\nTERMINATING");
+            System.exit(0);
+            return;
+        }
+
+        if (rawParams.size() < 1) {
+            numThreads = Runtime.getRuntime().availableProcessors() * 2;
+        } else {
+            try {
+                numThreads = Integer.parseInt(rawParams.get(0));
+            } catch (NumberFormatException e) {
+                System.err.println("Usage 'java MandelbrotFX {NUM_THREADS}'\nTERMINATING");
+                System.exit(0);
+                return;
+            }
+        }
+
         MandelbrotSet aMandelbrotSet = new MandelbrotSet(IMG_WIDTH, IMG_HEIGHT, numThreads);
 
         /*
@@ -50,7 +75,7 @@ public class MandelbrotFX extends Application {
         Scene scene = new Scene(root, IMG_WIDTH, IMG_HEIGHT);
         
         theStage.setTitle("Mandelbrot Set");
-	theStage.setResizable(false);
+	    theStage.setResizable(false);
         theStage.setScene(scene);
         theStage.show();
     }
